@@ -3,7 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\Auth\V1\AuthApiController;
-use App\Http\Controllers\API\ConversitionApiController;
+use App\Http\Controllers\API\ConversationApiController;
 
 
 /** authentication all Route
@@ -21,9 +21,9 @@ Route::prefix('v1/auth')->group(function () {
 });
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('v1/auth/logout', [AuthApiController::class, 'logoutApi']);
-    //conversition routes
-    Route::get('v1/conversitions', [ConversitionApiController::class, 'getConversationsByUserId']);
-    Route::post('v1/conversition/store', [ConversitionApiController::class, 'storeConversation']);
-    Route::get('v1/conversition/{conversation_id}', [ConversitionApiController::class, 'getConversationDetails']);
+    //conversation routes
+    Route::get('v1/conversations', [ConversationApiController::class, 'getConversationsByUserId']);
+    Route::post('v1/conversation/store', [ConversationApiController::class, 'storeConversation']);
+    Route::get('v1/conversation/{conversation_id}', [ConversationApiController::class, 'getConversationDetails']);
 
 });

@@ -13,10 +13,10 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Http;
 
-class ConversitionApiController extends Controller
+class ConversationApiController extends Controller
 {
     use ApiResponse;
-    //get conversition by user id
+    //get conversation by user id
     public function getConversationsByUserId()
     {
         $user = auth()->user();
@@ -44,7 +44,7 @@ class ConversitionApiController extends Controller
             return $this->sendError('Failed to retrieve conversations', ['error' => $e->getMessage()], 500);
         }
     }
-    //store conversition
+    //store conversation
 
     public function storeConversation(Request $request)
     {

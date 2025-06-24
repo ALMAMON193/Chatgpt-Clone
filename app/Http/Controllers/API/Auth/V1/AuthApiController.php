@@ -142,7 +142,7 @@ class AuthApiController extends Controller
             }
 
             // Check if email is already verified
-            if ($user->is_otp_verified) {
+            if ($user->email_verified_at) {
                 return $this->sendError('Email already verified', ['error' => 'This email is already verified'], 422);
             }
 

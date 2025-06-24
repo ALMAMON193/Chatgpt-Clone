@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
 
-             //otp releted
+             //otp related
             $table->string('otp')->nullable();
             $table->string('otp_created_at')->nullable();
             $table->boolean('is_otp_verified')->default(false);
@@ -32,7 +32,12 @@ return new class extends Migration
             $table->string('avatar')->nullable();
             //user type
             $table->enum('user_type', ['admin', 'user'])->default('user');
-
+            //subscribe related
+            $table->boolean('is_subscribe')->default(false);
+            $table->timestamp('subscribe_at')->nullable();
+            $table->timestamp('subscribe_expires_at')->nullable();
+            //admin user can block and delete
+            $table->enum('user_status', ['active', 'block','delete'])->default('active');
             //is verified
             $table->boolean('is_verified')->default(false);
             $table->rememberToken();
