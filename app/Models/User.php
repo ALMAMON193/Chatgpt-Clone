@@ -2,15 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Conversation;
 use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Notifications\Notifiable;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens;
-
+    use HasApiTokens;
     protected $table = 'users';
 
     protected $fillable = [
@@ -28,6 +26,7 @@ class User extends Authenticatable
         'avatar',
         'user_type',
         'is_verified',
+        'is_subscribe',
     ];
 
     protected $hidden = [
@@ -43,10 +42,11 @@ class User extends Authenticatable
         'password' => 'hashed',
         'otp_created_at' => 'datetime',
         'otp_expires_at' => 'datetime',
-        'reset_password_token_expire_at' => 'datetime',
+        'reset_password_token_exPIRE_at' => 'datetime',
         'delete_token_expires_at' => 'datetime',
         'is_otp_verified' => 'boolean',
         'is_verified' => 'boolean',
+        'is_subscribe' => 'boolean',
     ];
 
     // Relationship with conversations

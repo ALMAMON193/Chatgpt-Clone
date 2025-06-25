@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Mail\OtpMail;
 use App\Traits\ApiResponse;
 use Illuminate\Support\Str;
+use App\Models\Conversation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -27,6 +28,7 @@ class AuthApiController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
+            'visitor_id' => 'nullable|string|max:255',
         ]);
         if ($validator->fails()) {
             return $this->sendError('Validation failed', $validator->errors()->toArray(), 422);
@@ -44,6 +46,10 @@ class AuthApiController extends Controller
                 'otp_expires_at' => $otpExpiresAt,
                 'is_otp_verified' => false,
             ]);
+            // Merge guest conversations if visitor_id is provided
+            if ($request->visitor_id) {
+                $this->mergeGuestConversations($user->id, $request->visitor_id);
+            }
 
             // Send OTP email
             // Mail::to($user->email)->send(new OtpMail($otp, $user, 'Verify Your Email Address'));
@@ -67,6 +73,7 @@ class AuthApiController extends Controller
         $validator = validator::make($request->all(), [
             'email' => 'required|string|email',
             'password' => 'required|string|min:8',
+            'visitor_id' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -88,6 +95,11 @@ class AuthApiController extends Controller
             // Check if the email is verified before login is successful
             if (!$user->email_verified_at) {
                 return $this->sendError('Email Not Verified', ['error' => 'Email Not Verified'], 401);
+            }
+            // Merge guest conversations
+            if ($request->visitor_id) {
+                $mergedCount = $this->mergeGuestConversations($user->id, $request->visitor_id);
+                Log::info("Merged $mergedCount guest conversations for user ID {$user->id} with visitor ID {$request->visitor_id}");
             }
 
             // Generate token if email is verified
@@ -319,6 +331,34 @@ class AuthApiController extends Controller
         } catch (Exception $e) {
             Log::error('Logout Error', (array)$e->getMessage());
             return $this->sendError('An error occurred during logout', ['error' => 'Please try again later'], 500);
+        }
+    }
+
+    protected function mergeGuestConversations($userId, $visitorId)
+    {
+        try {
+            if (empty($visitorId)) {
+                Log::warning("No visitor_id provided for merging conversations for user ID {$userId}");
+                return 0;
+            }
+            $conversations = Conversation::where('device_id', $visitorId)
+                ->whereNull('user_id')
+                ->get();
+            if ($conversations->isEmpty()) {
+                Log::info("No guest conversations found for visitor ID {$visitorId}");
+                Log::info('Available device_ids', [
+                    'device_ids' => Conversation::whereNotNull('device_id')->pluck('device_id')->toArray(),
+                ]);
+            }
+            return Conversation::where('device_id', $visitorId)
+                ->whereNull('user_id')
+                ->update([
+                    'user_id' => $userId,
+                    'device_id' => null,
+                ]);
+        } catch (Exception $e) {
+            Log::error("Failed to merge guest conversations for user ID {$userId} with visitor ID {$visitorId}: " . $e->getMessage());
+            return 0;
         }
     }
 }

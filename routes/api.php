@@ -19,11 +19,16 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('resend-otp', [AuthApiController::class, 'resendOtpApi']);
     Route::post('verify-otp', [AuthApiController::class, 'verifyOtpApi']);
 });
+Route::prefix('v1/')->group(function () {
+    //conversation routes
+    Route::post('generate-visitor-id', [ConversationApiController::class, 'generateVisitorId']);
+    Route::post('conversation/store', [ConversationApiController::class, 'storeConversation']);
+});
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('v1/auth/logout', [AuthApiController::class, 'logoutApi']);
-    //conversation routes
-    Route::get('v1/conversations', [ConversationApiController::class, 'getConversationsByUserId']);
-    Route::post('v1/conversation/store', [ConversationApiController::class, 'storeConversation']);
-    Route::get('v1/conversation/{conversation_id}', [ConversationApiController::class, 'getConversationDetails']);
-
+});
+Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
+    Route::post('auth/logout', [AuthApiController::class, 'logoutApi']);
+    Route::get('conversations', [ConversationApiController::class, 'getConversationsByUserId']);
+    Route::get('conversation/{conversation_id}', [ConversationApiController::class, 'getConversationDetails']);
 });

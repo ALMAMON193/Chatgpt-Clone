@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\User;
+use App\Models\ConversationData;
 use Illuminate\Database\Eloquent\Model;
 
 class Conversation extends Model
@@ -11,11 +13,13 @@ class Conversation extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'device_id',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+
     ];
 
     public function user()

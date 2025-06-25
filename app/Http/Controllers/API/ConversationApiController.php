@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Http\Controllers\API;
+namespace App\Http\Controllers\Api;
 
 use Exception;
+use App\Models\Device;
+use App\Models\UsageLog;
 use App\Traits\ApiResponse;
+use Illuminate\Support\Str;
 use App\Models\Conversation;
-use App\Models\Conversition;
 use Illuminate\Http\Request;
 use App\Models\ConversationData;
-use OpenAI\Laravel\Facades\OpenAI;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Http;
@@ -16,25 +17,54 @@ use Illuminate\Support\Facades\Http;
 class ConversationApiController extends Controller
 {
     use ApiResponse;
-    //get conversation by user id
+
+    // Generate or validate visitor_id
+    public function generateVisitorId(Request $request)
+    {
+        try {
+            $visitorId = $request->header('X-Visitor-ID') ?? Str::random(32);
+            Device::firstOrCreate(['device_id' => $visitorId]);
+            return $this->sendResponse(['visitor_id' => $visitorId], 'Visitor ID generated or validated successfully');
+        } catch (Exception $e) {
+            Log::error('Failed to generate visitor ID: ' . $e->getMessage());
+            return $this->sendError('Failed to generate visitor ID', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    // Get conversations by user ID or visitor ID
     public function getConversationsByUserId()
     {
         $user = auth()->user();
-        if (!$user) {
-            return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
+        $visitorId = request()->header('X-Visitor-ID');
+        if (!$user && !$visitorId) {
+            Log::warning('Unauthorized access to conversations: No user or visitor ID provided');
+            return $this->sendError('Unauthorized', ['error' => 'User not authenticated or Visitor ID missing'], 401);
         }
 
         try {
-            $conversations = Conversation::where('user_id', $user->id)->get();
+            $conversations = collect();
+
+            if ($user) {
+                Log::info("Fetching conversations for authenticated user ID: {$user->id}");
+                $conversations = Conversation::where('user_id', $user->id)->get();
+
+            } else {
+                Log::info("Fetching conversations for guest with visitor ID: {$visitorId}");
+                Device::firstOrCreate(['device_id' => $visitorId]);
+                $conversations = Conversation::where('device_id', $visitorId)->get();
+            }
+
+            if ($conversations->isEmpty()) {
+                Log::info("No conversations found for " . ($user ? "user ID {$user->id}" : "visitor ID {$visitorId}"));
+            }
 
             $success = $conversations->map(function ($conversation) {
                 return [
                     'conversation_id' => $conversation->id,
-                    'conversation_name' => $conversation->name,
+                    'conversation_name' => $conversation->name ?? 'Untitled Conversation',
                     'user_id' => $conversation->user_id,
-                    'created_at' => $conversation->created_at,
-                    'updated_at' => $conversation->updated_at,
-
+                    'created_at' => $conversation->created_at->toISOString(),
+                    'updated_at' => $conversation->updated_at->toISOString(),
                 ];
             });
 
@@ -44,14 +74,26 @@ class ConversationApiController extends Controller
             return $this->sendError('Failed to retrieve conversations', ['error' => $e->getMessage()], 500);
         }
     }
-    //store conversation
 
+
+    // Store conversation
     public function storeConversation(Request $request)
     {
-        // Check if user is authenticated
         $user = auth()->user();
+        $visitorId = $request->header('X-Visitor-ID');
+
+        if (!$user && !$visitorId) {
+            return $this->sendError('Unauthorized', ['error' => 'User not authenticated or Visitor ID missing'], 401);
+        }
+
         if (!$user) {
-            return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
+            Device::firstOrCreate(['device_id' => $visitorId]);
+        }
+
+        // Check usage limit
+        $usageCheck = $this->checkUsageLimit($user, $visitorId);
+        if ($usageCheck['exceeded']) {
+            return $this->sendError('Usage Limit Exceeded', ['error' => $usageCheck['message']], 429);
         }
 
         $apiKey = config('services.openAi.api_key');
@@ -63,11 +105,15 @@ class ConversationApiController extends Controller
         $validated = $request->validate([
             'input_text' => 'required|string|max:2000',
             'conversation_id' => 'nullable|integer|exists:conversations,id',
+            'message_history' => 'nullable|array',
+            'message_history.*.role' => 'required|string|in:user,assistant',
+            'message_history.*.content' => 'required|string',
         ]);
 
         try {
             $inputText = $validated['input_text'];
             $conversationId = $validated['conversation_id'] ?? null;
+            $messageHistory = $validated['message_history'] ?? [];
             $outputText = null;
             $messages = [
                 ['role' => 'system', 'content' => 'You are a helpful assistant.'],
@@ -77,9 +123,13 @@ class ConversationApiController extends Controller
 
             // Handle existing conversation
             if ($conversationId) {
-                $conversation = Conversation::where('id', $conversationId)
-                    ->where('user_id', $user->id)
-                    ->first();
+                $query = Conversation::where('id', $conversationId);
+                if ($user) {
+                    $query->where('user_id', $user->id);
+                } else {
+                    $query->where('device_id', $visitorId);
+                }
+                $conversation = $query->first();
 
                 if ($conversation) {
                     // Fetch last 10 messages for context
@@ -95,6 +145,8 @@ class ConversationApiController extends Controller
                         $messages[] = ['role' => 'assistant', 'content' => $message->output_text];
                     }
                 }
+            } elseif (!$user) {
+                $messages = array_merge($messages, $messageHistory);
             }
 
             // Add current input text
@@ -120,13 +172,13 @@ class ConversationApiController extends Controller
 
             // Create new conversation if none exists
             if (!$conversation) {
-                // Generate conversation name based on input
                 $conversationName = substr($inputText, 0, 20);
                 if (strlen($inputText) > 20) {
                     $conversationName .= '...';
                 }
                 $conversation = Conversation::create([
-                    'user_id' => $user->id,
+                    'user_id' => $user ? $user->id : null,
+                    'device_id' => $user ? null : $visitorId,
                     'name' => $conversationName,
                 ]);
             }
@@ -137,6 +189,11 @@ class ConversationApiController extends Controller
                 'input_text' => $inputText,
                 'output_text' => $outputText,
             ]);
+
+            // Log usage for non-subscribed users or guests
+            if (!$user || ($user && !$user->is_subscribe)) {
+                $this->logUsage($user, $visitorId, 30);
+            }
 
             // Prepare success response
             $success = [
@@ -156,13 +213,14 @@ class ConversationApiController extends Controller
         }
     }
 
-    //get conversation by id
+    // Get conversation by ID
     public function getConversationDetails($conversation_id)
     {
-        // Check if user is authenticated
         $user = auth()->user();
-        if (!$user) {
-            return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
+        $visitorId = request()->header('X-Visitor-ID');
+
+        if (!$user && !$visitorId) {
+            return $this->sendError('Unauthorized', ['error' => 'User not authenticated or Visitor ID missing'], 401);
         }
 
         // Validate conversation_id
@@ -172,14 +230,19 @@ class ConversationApiController extends Controller
 
         try {
             // Fetch the conversation with its conversation data
-            $conversation = Conversation::where('id', $conversation_id)
-                ->where('user_id', $user->id)
+            $query = Conversation::where('id', $conversation_id)
                 ->with(['conversationData' => function ($query) {
                     $query->orderBy('created_at', 'asc');
-                }])
-                ->first();
+                }]);
 
-            // Check if conversation exists and belongs to the user
+            if ($user) {
+                $query->where('user_id', $user->id);
+            } else {
+                $query->where('device_id', $visitorId);
+            }
+
+            $conversation = $query->first();
+
             if (!$conversation) {
                 return $this->sendError('Not Found', ['error' => 'Conversation not found or not owned by user'], 404);
             }
@@ -202,11 +265,65 @@ class ConversationApiController extends Controller
                 })->toArray(),
             ];
 
-            $message = 'Conversation details retrieved successfully';
-            return $this->sendResponse($success, $message);
+            return $this->sendResponse($success, 'Conversation details retrieved successfully');
         } catch (Exception $e) {
             Log::error('Failed to retrieve conversation details: ' . $e->getMessage());
             return $this->sendError('Failed to retrieve conversation details', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    // Check usage limit for guests (10 min) and non-subscribed users (30 min)
+    private function checkUsageLimit($user, $visitorId)
+    {
+        if ($user && $user->is_subscribe) {
+            return [
+                'exceeded' => false,
+                'message' => '',
+                'used_seconds' => 0,
+                'limit_seconds' => 0,
+            ];
+        }
+
+        $today = now()->startOfDay();
+        $limitSeconds = $user ? 30 * 60 : 10 * 60;
+
+        if ($user) {
+            $usageSeconds = UsageLog::where('user_id', $user->id)
+                ->where('created_at', '>=', $today)
+                ->sum('duration_seconds');
+        } else {
+            $usageSeconds = UsageLog::where('device_id', $visitorId)
+                ->where('created_at', '>=', $today)
+                ->sum('duration_seconds');
+        }
+
+        $exceeded = $usageSeconds >= $limitSeconds;
+        $message = $exceeded ? ($user ? 'Daily 30-minute limit reached' : 'You are already 10 min over') : '';
+
+        return [
+            'exceeded' => $exceeded,
+            'message' => $message,
+            'used_seconds' => $usageSeconds,
+            'limit_seconds' => $limitSeconds,
+        ];
+    }
+
+    // Log usage for guests and non-subscribed users
+    private function logUsage($user, $visitorId, $durationSeconds)
+    {
+        if ($user && $user->is_subscribe) {
+            return;
+        }
+
+        try {
+            UsageLog::create([
+                'user_id' => $user ? $user->id : null,
+                'device_id' => $user ? null : $visitorId,
+                'duration_seconds' => $durationSeconds,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to log usage: ' . $e->getMessage());
         }
     }
 }
