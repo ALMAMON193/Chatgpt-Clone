@@ -163,12 +163,25 @@ class SubscriptionController extends Controller
             return response()->json(['message' => 'Payment processing failed'], 500);
         }
     }
-
     public function cancel()
     {
         return redirect('https://maoiexperts.org/payment-failed')->with([
             'status' => false,
             'message' => 'Payment canceled',
         ], 200);
+    }
+    //user subscription
+    public function subscriptionForUser()
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
+        }
+        $subscription = UserSubscription::where('user_id', $user->id)
+            ->where('status', 'active')
+            ->latest()
+            ->first() ?? [];
+
+        return $this->sendResponse($subscription, 'Subscription retrieved successfully');
     }
 }

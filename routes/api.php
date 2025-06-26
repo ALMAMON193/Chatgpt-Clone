@@ -36,9 +36,12 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
 
 //subscription routes
 Route::middleware('auth:sanctum')->group(function () {
-   Route::post('v1/get-subscription', [SubscriptionController::class, 'getSubscription']);
+    Route::post('v1/get-subscription', [SubscriptionController::class, 'getSubscription']);
+    //user subscription
+    Route::get('v1/user-subscriptions', [SubscriptionController::class, 'subscriptionForUser']);
 });
 Route::get('v1/plans', [SubscriptionController::class, 'getPlans']);
+
 
 Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
 Route::get('/payment/success', [SubscriptionController::class, 'success'])->name('payment.success');
