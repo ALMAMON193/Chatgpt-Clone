@@ -47,7 +47,6 @@ class ConversationApiController extends Controller
             if ($user) {
                 Log::info("Fetching conversations for authenticated user ID: {$user->id}");
                 $conversations = Conversation::where('user_id', $user->id)->get();
-
             } else {
                 Log::info("Fetching conversations for guest with visitor ID: {$visitorId}");
                 Device::firstOrCreate(['device_id' => $visitorId]);
@@ -79,6 +78,9 @@ class ConversationApiController extends Controller
     // Store conversation
     public function storeConversation(Request $request)
     {
+        // Record start time
+        $startTime = microtime(true);
+
         $user = auth()->user();
         $visitorId = $request->header('X-Visitor-ID');
 
@@ -190,9 +192,13 @@ class ConversationApiController extends Controller
                 'output_text' => $outputText,
             ]);
 
+            // Calculate duration
+            $endTime = microtime(true);
+            $duration = round($endTime - $startTime, 2); // Duration in seconds
+
             // Log usage for non-subscribed users or guests
             if (!$user || ($user && !$user->is_subscribe)) {
-                $this->logUsage($user, $visitorId, 30);
+                $this->logUsage($user, $visitorId, $duration);
             }
 
             // Prepare success response
@@ -286,7 +292,7 @@ class ConversationApiController extends Controller
         }
 
         $today = now()->startOfDay();
-        $limitSeconds = $user ? 30 * 60 : 10 * 60;
+        $limitSeconds = $user ? 2 * 60 : 1 * 60;
 
         if ($user) {
             $usageSeconds = UsageLog::where('user_id', $user->id)
@@ -299,7 +305,7 @@ class ConversationApiController extends Controller
         }
 
         $exceeded = $usageSeconds >= $limitSeconds;
-        $message = $exceeded ? ($user ? 'Daily 30-minute limit reached' : 'You are already 10 min over') : '';
+        $message = $exceeded ? ($user ? 'Daily 2-minute limit reached' : 'You are already 1 min over') : '';
 
         return [
             'exceeded' => $exceeded,

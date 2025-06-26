@@ -11,14 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('usage_logs', function (Blueprint $table) {
+        Schema::create('plans', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id')->nullable();
-             $table->string('device_id')->nullable()->index();
-            $table->decimal('duration_seconds', 8, 2);
+            $table->string('name', 50);
+            $table->decimal('price', 5, 2)->default(0.00);
+            $table->string('duration', 20);
             $table->timestamps();
-
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('usage_logs');
+        Schema::dropIfExists('plans');
     }
 };

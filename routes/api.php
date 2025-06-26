@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\SubscriptionController;
 use App\Http\Controllers\API\Auth\V1\AuthApiController;
 use App\Http\Controllers\API\ConversationApiController;
 
@@ -32,3 +33,13 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::get('conversations', [ConversationApiController::class, 'getConversationsByUserId']);
     Route::get('conversation/{conversation_id}', [ConversationApiController::class, 'getConversationDetails']);
 });
+
+//subscription routes
+Route::middleware('auth:sanctum')->group(function () {
+   Route::post('v1/get-subscription', [SubscriptionController::class, 'getSubscription']);
+});
+Route::get('v1/plans', [SubscriptionController::class, 'getPlans']);
+
+Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
+Route::get('/payment/success', [SubscriptionController::class, 'success'])->name('payment.success');
+Route::get('/payment/cancel', [SubscriptionController::class, 'cancel'])->name('payment.cancel');

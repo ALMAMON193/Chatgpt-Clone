@@ -111,6 +111,7 @@ class AuthApiController extends Controller
                 'email' => $user->email,
                 'user_type' => $user->user_type,
                 'is_verified' => $user->is_verified,
+                'is_subscribe' => $user->is_subscribe,
             ];
             return $this->sendResponse($success, 'Login successful', $token);
         } catch (Exception $e) {
