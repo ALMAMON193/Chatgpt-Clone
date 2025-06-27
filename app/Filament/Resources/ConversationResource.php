@@ -7,6 +7,7 @@ use App\Models\Conversation;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -26,7 +27,6 @@ class ConversationResource extends Resource
                     ->schema([
                         TextEntry::make('name')->label('Conversation Name'),
                         TextEntry::make('user.name')->label('User'),
-                        TextEntry::make('device_id')->label('Device ID'),
                         TextEntry::make('created_at')->dateTime(),
                         TextEntry::make('updated_at')->dateTime(),
                     ])
@@ -51,15 +51,14 @@ class ConversationResource extends Resource
             ->columns([
                 TextColumn::make('name')->label('Conversation Name')->sortable()->searchable(),
                 TextColumn::make('user.name')->label('User')->sortable()->searchable(),
-                TextColumn::make('device_id')->label('Device ID')->sortable()->searchable(),
                 TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([
-                //
+                // Add filters here if needed
             ])
+            ->filtersLayout(FiltersLayout::AboveContent)
             ->actions([
                 \Filament\Tables\Actions\ViewAction::make(),
-                \Filament\Tables\Actions\EditAction::make(),
                 \Filament\Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
@@ -78,9 +77,7 @@ class ConversationResource extends Resource
     {
         return [
             'index' => Pages\ListConversations::route('/'),
-            'create' => Pages\CreateConversation::route('/create'),
             'view' => Pages\ViewConversation::route('/{record}'),
-            'edit' => Pages\EditConversation::route('/{record}/edit'),
         ];
     }
 }

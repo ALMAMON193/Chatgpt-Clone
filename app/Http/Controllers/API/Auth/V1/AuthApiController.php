@@ -6,10 +6,12 @@ use Exception;
 use Carbon\Carbon;
 use App\Models\User;
 use App\Mail\OtpMail;
+use App\Models\UsageLog;
 use App\Traits\ApiResponse;
 use Illuminate\Support\Str;
 use App\Models\Conversation;
 use Illuminate\Http\Request;
+use App\Models\ConversationUsage;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
@@ -23,21 +25,20 @@ class AuthApiController extends Controller
     //register api
     public function registerApi(Request $request)
     {
-        // Validate the request data
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'visitor_id' => 'nullable|string|max:255',
         ]);
+
         if ($validator->fails()) {
             return $this->sendError('Validation failed', $validator->errors()->toArray(), 422);
         }
+
         try {
             $otp = random_int(100000, 999999);
-            $otpExpiresAt = Carbon::now()->addMinutes(10); // OTP valid for 10 minutes
+            $otpExpiresAt = Carbon::now()->timezone('+06:00')->addMinutes(10);
 
-            // Create user
             $user = User::create([
                 'name' => $request->input('name'),
                 'email' => $request->input('email'),
@@ -46,34 +47,51 @@ class AuthApiController extends Controller
                 'otp_expires_at' => $otpExpiresAt,
                 'is_otp_verified' => false,
             ]);
-            // Merge guest conversations if visitor_id is provided
-            if ($request->visitor_id) {
-                $this->mergeGuestConversations($user->id, $request->visitor_id);
+
+            // 🧠 If Guest-Token exists, migrate data
+            $guestToken = $request->header('Guest-Token');
+            if ($guestToken) {
+                // Update conversations
+                Conversation::where('guest_token', $guestToken)->update([
+                    'user_id' => $user->id,
+                    'guest_token' => null,
+
+                ]);
+
+                // Update usage
+                ConversationUsage::where('guest_token', $guestToken)->update([
+                    'user_id' => $user->id,
+                    'guest_token' => null,
+                    'is_guest' => false,
+                    'first_used_at' => null,
+                    'last_used_at' => null,
+                    'usage_minutes' => null,
+                ]);
+
+                // Delete guest User if exists
+                User::where('guest_token', $guestToken)->where('is_guest', true)->delete();
             }
 
-            // Send OTP email
-            // Mail::to($user->email)->send(new OtpMail($otp, $user, 'Verify Your Email Address'));
             $success = [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'user_type' => $user->user_type,
+                'user_type' => $user->user_type ?? null,
             ];
 
-            return $this->sendResponse($success, 'Register Successfully Please Verify Your Email :' . $otp);
+            return $this->sendResponse($success, 'Register Successfully. Please check your email to verify. OTP: ' . $otp);
         } catch (Exception $e) {
-            Log::error('Register Error', (array)$e->getMessage());
-            return $this->sendError($e->getMessage());
+            Log::error('Register Error: ' . $e->getMessage(), ['context' => $request->all()]);
+            return $this->sendError('Registration failed: ' . $e->getMessage(), [], 500);
         }
     }
-    //login api
+
+
     public function loginApi(Request $request)
     {
-        // Validate login credentials
-        $validator = validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'email' => 'required|string|email',
             'password' => 'required|string|min:8',
-            'visitor_id' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -83,27 +101,46 @@ class AuthApiController extends Controller
         try {
             $user = User::where('email', $request->email)->first();
 
-            if (empty($user)) {
+            if (!$user) {
                 return $this->sendError('User Not Found', ['error' => 'User Not Found'], 401);
             }
 
-            // Check the password
             if (!Hash::check($request->password, $user->password)) {
-                return $this->sendError('Invalid password', ['error' => 'Invalid Password and Email'], 401);
+                return $this->sendError('Invalid password', ['error' => 'Invalid Password or Email'], 401);
             }
 
-            // Check if the email is verified before login is successful
             if (!$user->email_verified_at) {
                 return $this->sendError('Email Not Verified', ['error' => 'Email Not Verified'], 401);
             }
-            // Merge guest conversations
-            if ($request->visitor_id) {
-                $mergedCount = $this->mergeGuestConversations($user->id, $request->visitor_id);
-                Log::info("Merged $mergedCount guest conversations for user ID {$user->id} with visitor ID {$request->visitor_id}");
-            }
 
-            // Generate token if email is verified
             $token = $user->createToken('YourAppName')->plainTextToken;
+
+            // // ✅ Check for guest token in header
+            // $guestToken = $request->header('Guest-Token');
+
+            // if ($guestToken) {
+            //     // ✅ Migrate guest conversations to authenticated user
+            //     Conversation::where('guest_token', $guestToken)
+            //         ->whereNull('user_id') // optional: only update if not yet linked
+            //         ->update([
+            //             'user_id' => $user->id,
+            //             'guest_token' => null, // optional: clear the guest_token
+            //         ]);
+
+            //     // ✅ Migrate guest usage
+            //     ConversationUsage::where('guest_token', $guestToken)
+            //         ->whereNull('user_id')
+            //         ->update([
+            //             'user_id' => $user->id,
+            //             'guest_token' => null,
+            //             'is_guest' => false,
+            //         ]);
+
+            //     // ✅ Optional: Remove old guest user if you created one
+            //     User::where('guest_token', $guestToken)
+            //         ->where('is_guest', true)
+            //         ->delete();
+            // }
 
             $success = [
                 'id' => $user->id,
@@ -113,12 +150,16 @@ class AuthApiController extends Controller
                 'is_verified' => $user->is_verified,
                 'is_subscribe' => $user->is_subscribe,
             ];
+
             return $this->sendResponse($success, 'Login successful', $token);
         } catch (Exception $e) {
-            Log::error('Login Error', (array)$e->getMessage());
-            return $this->sendError($e->getMessage());
+            Log::error('Login Error: ' . $e->getMessage());
+            return $this->sendError('Login failed', ['error' => $e->getMessage()], 500);
         }
     }
+
+
+
     //email verified
     public function verifyEmailApi(Request $request)
     {

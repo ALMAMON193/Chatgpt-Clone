@@ -27,6 +27,8 @@ class User extends Authenticatable
         'user_type',
         'is_verified',
         'is_subscribe',
+        'guest_token',
+        'is_guest',
     ];
 
     protected $hidden = [

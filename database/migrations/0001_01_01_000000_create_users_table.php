@@ -13,12 +13,12 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
+            $table->string('name')->nullable();
+            $table->string('email')->unique()->nullable();
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
+            $table->string('password')->nullable();
 
-             //otp related
+            //otp related
             $table->string('otp')->nullable();
             $table->string('otp_created_at')->nullable();
             $table->boolean('is_otp_verified')->default(false);
@@ -37,9 +37,13 @@ return new class extends Migration
             $table->timestamp('subscribe_at')->nullable();
             $table->timestamp('subscribe_expires_at')->nullable();
             //admin user can block and delete
-            $table->enum('user_status', ['active', 'block','delete'])->default('active');
+            $table->enum('user_status', ['active', 'block', 'delete'])->default('active');
             //is verified
             $table->boolean('is_verified')->default(false);
+            //guest user
+            $table->boolean('is_guest')->default(false);
+            $table->string('guest_token')->nullable();
+
             $table->rememberToken();
             $table->timestamps();
         });

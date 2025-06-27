@@ -14,7 +14,8 @@
         "laravel/sanctum": "^4.1",
         "laravel/tinker": "^2.9",
         "openai-php/laravel": "^0.13.0",
-        "srmklive/paypal": "~3.0"
+        "srmklive/paypal": "~3.0",
+        "tapp/filament-authentication-log": "^4.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

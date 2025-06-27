@@ -11,16 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('conversations', function (Blueprint $table) {
+        Schema::create('conversation_usages', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->nullable();
             $table->string('guest_token')->nullable();
-            $table->string('name')->nullable();
-            $table->timestamp('started_at')->nullable(); // session start
-            $table->timestamp('ended_at')->nullable(); // session end
+            $table->date('date'); // Date of usage
+            $table->integer('usage_minutes')->default(0); // Calculated from first_used_at to last_used_at
+            $table->boolean('is_guest')->default(false);
+            $table->timestamp('first_used_at')->nullable(); // ✅ First usage of the day
+            $table->timestamp('last_used_at')->nullable();  // ✅ Last usage of the day
             $table->timestamps();
-
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('conversations');
+        Schema::dropIfExists('conversation_usages');
     }
 };

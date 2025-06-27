@@ -21,16 +21,16 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('verify-otp', [AuthApiController::class, 'verifyOtpApi']);
 });
 Route::prefix('v1/')->group(function () {
-    //conversation routes
-    Route::post('generate-visitor-id', [ConversationApiController::class, 'generateVisitorId']);
     Route::post('conversation/store', [ConversationApiController::class, 'storeConversation']);
+    //conversation routes
+    Route::post('guest-user-create', [ConversationApiController::class, 'createGuestUser']);
 });
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('v1/auth/logout', [AuthApiController::class, 'logoutApi']);
 });
 Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
     Route::post('auth/logout', [AuthApiController::class, 'logoutApi']);
-    Route::get('conversations', [ConversationApiController::class, 'getConversationsByUserId']);
+    Route::get('conversations', [ConversationApiController::class, 'getConversations']);
     Route::get('conversation/{conversation_id}', [ConversationApiController::class, 'getConversationDetails']);
 });
 
@@ -40,9 +40,8 @@ Route::middleware('auth:sanctum')->group(function () {
     //user subscription
     Route::get('v1/user-subscriptions', [SubscriptionController::class, 'subscriptionForUser']);
 });
+
 Route::get('v1/plans', [SubscriptionController::class, 'getPlans']);
-
-
 Route::post('/subscribe', [SubscriptionController::class, 'subscribe']);
 Route::get('/payment/success', [SubscriptionController::class, 'success'])->name('payment.success');
 Route::get('/payment/cancel', [SubscriptionController::class, 'cancel'])->name('payment.cancel');

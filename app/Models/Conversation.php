@@ -12,8 +12,10 @@ class Conversation extends Model
 
     protected $fillable = [
         'user_id',
+        'guest_token',
         'name',
-        'device_id',
+        'started_at',
+        'ended_at'
     ];
 
     protected $casts = [
