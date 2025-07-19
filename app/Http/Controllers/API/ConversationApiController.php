@@ -1,21 +1,14 @@
 <?php
-
 namespace App\Http\Controllers\Api;
 
-use Exception;
-use App\Models\User;
-use App\Models\Device;
-use App\Models\UsageLog;
-use App\Traits\ApiResponse;
-use Illuminate\Support\Str;
-use App\Models\Conversation;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use App\Models\ConversationData;
-use App\Models\ConversationUsage;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Http;
+use App\Models\Conversation;
+use App\Models\ConversationData;
+use App\Models\User;
+use App\Traits\ApiResponse;
+use Exception;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ConversationApiController extends Controller
 {
@@ -27,16 +20,16 @@ class ConversationApiController extends Controller
             'guest_token' => 'required|string',
         ]);
         $guestToken = $request->input('guest_token');
-        $user = User::where('guest_token', $guestToken)->first();
-        if (!$user) {
+        $user       = User::where('guest_token', $guestToken)->first();
+        if (! $user) {
             $user = User::create([
-                'is_guest' => true,
+                'is_guest'    => true,
                 'guest_token' => $guestToken,
             ]);
         }
         $responseData = [
             'guest_token' => $user->guest_token,
-            'is_guest' => $user->is_guest,
+            'is_guest'    => $user->is_guest,
         ];
         $message = 'Guest user found or created';
 
@@ -44,9 +37,9 @@ class ConversationApiController extends Controller
     }
     public function getConversations(Request $request)
     {
-        $user = auth('api')->user();
+        $user       = auth('api')->user();
         $guestToken = $request->header('Guest-Token');
-        if (!$user && !$guestToken) {
+        if (! $user && ! $guestToken) {
             return $this->sendError('Unauthorized', ['error' => 'No user or guest token provided'], 401);
         }
         try {
@@ -66,12 +59,12 @@ class ConversationApiController extends Controller
 
             $result = $conversations->map(function ($conversation) {
                 return [
-                    'conversation_id' => $conversation->id,
+                    'conversation_id'   => $conversation->id,
                     'conversation_name' => $conversation->name,
-                    'user_id' => $conversation->user_id,
-                    'guest_token' => $conversation->guest_token,
-                    'created_at' => $conversation->created_at,
-                    'updated_at' => $conversation->updated_at,
+                    'user_id'           => $conversation->user_id,
+                    'guest_token'       => $conversation->guest_token,
+                    'created_at'        => $conversation->created_at,
+                    'updated_at'        => $conversation->updated_at,
                 ];
             });
 
@@ -82,185 +75,183 @@ class ConversationApiController extends Controller
         }
     }
 
-
-
     // Store conversation
-    //     public function storeConversation(Request $request)
-    //     {
-    //         // Check if user is authenticated
-    //         $user = auth('api')->user();
-    //         dd($user);
-    //         if (!$user) {
-    //             return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
-    //         }
-    //         $apiKey = config('services.openAi.api_key');
-    //         if (!$apiKey) {
-    //             return $this->sendError('API Key Missing', ['error' => 'OpenAI API key is not configured'], 500);
+    // public function storeConversation(Request $request)
+    // {
+    //     // Check if user is authenticated
+    //     $user = auth('api')->user();
+
+    //     if (! $user) {
+    //         return $this->sendError('Unauthorized', ['error' => 'User not authenticated'], 401);
+    //     }
+    //     $apiKey = config('services.openAi.api_key');
+    //     if (! $apiKey) {
+    //         return $this->sendError('API Key Missing', ['error' => 'OpenAI API key is not configured'], 500);
+    //     }
+
+    //     // Validate request
+    //     $validated = $request->validate([
+    //         'input_text'      => 'required|string|max:2000',
+    //         'conversation_id' => 'nullable|integer|exists:conversations,id',
+    //     ]);
+
+    //     try {
+    //         $inputText      = $validated['input_text'];
+    //         $conversationId = $validated['conversation_id'] ?? null;
+    //         $outputText     = "response text";
+    //         $messages       = [
+    //             ['role' => 'system', 'content' => 'You are a helpful assistant.'],
+    //         ];
+
+    //         $conversation = null;
+
+    //         // Handle existing conversation
+    //         if ($conversationId) {
+    //             $conversation = Conversation::where('id', $conversationId)
+    //                 ->where('user_id', $user->id)
+    //                 ->first();
+
+    //             if ($conversation) {
+    //                 // Fetch last 10 messages for context
+    //                 $lastMessages = ConversationData::where('conversation_id', $conversationId)
+    //                     ->orderBy('created_at', 'desc')
+    //                     ->take(10)
+    //                     ->get()
+    //                     ->reverse()
+    //                     ->values();
+
+    //                 foreach ($lastMessages as $message) {
+    //                     $messages[] = ['role' => 'user', 'content' => $message->input_text];
+    //                     $messages[] = ['role' => 'assistant', 'content' => $message->output_text];
+    //                 }
+    //             }
     //         }
 
-    //         // Validate request
-    //         $validated = $request->validate([
-    //             'input_text' => 'required|string|max:2000',
-    //             'conversation_id' => 'nullable|integer|exists:conversations,id',
+    //         // Add current input text
+    //         $messages[] = ['role' => 'user', 'content' => $inputText];
+
+    //         // Make API request to OpenAI
+    //         $response = Http::withHeaders([
+    //             'Authorization' => 'Bearer ' . $apiKey,
+    //             'Content-Type'  => 'application/json',
+    //         ])->post('https://api.openai.com/v1/chat/completions', [
+    //             'model'      => 'gpt-3.5-turbo',
+    //             'messages'   => $messages,
+    //             'max_tokens' => 300,
     //         ]);
 
-    //         try {
-    //             $inputText = $validated['input_text'];
-    //             $conversationId = $validated['conversation_id'] ?? null;
-    //             $outputText = "response text";
-    //             $messages = [
-    //                 ['role' => 'system', 'content' => 'You are a helpful assistant.'],
-    //             ];
-
-    //             $conversation = null;
-
-    //             // Handle existing conversation
-    //             if ($conversationId) {
-    //                 $conversation = Conversation::where('id', $conversationId)
-    //                     ->where('user_id', $user->id)
-    //                     ->first();
-
-    //                 if ($conversation) {
-    //                     // Fetch last 10 messages for context
-    //                     $lastMessages = ConversationData::where('conversation_id', $conversationId)
-    //                         ->orderBy('created_at', 'desc')
-    //                         ->take(10)
-    //                         ->get()
-    //                         ->reverse()
-    //                         ->values();
-
-    //                     foreach ($lastMessages as $message) {
-    //                         $messages[] = ['role' => 'user', 'content' => $message->input_text];
-    //                         $messages[] = ['role' => 'assistant', 'content' => $message->output_text];
-    //                     }
-    //                 }
-    //             }
-
-    //             // Add current input text
-    //             $messages[] = ['role' => 'user', 'content' => $inputText];
-
-    //             // Make API request to OpenAI
-    //             /* $response = Http::withHeaders([
-    //                 'Authorization' => 'Bearer ' . $apiKey,
-    //                 'Content-Type' => 'application/json',
-    //             ])->post('https://api.openai.com/v1/chat/completions', [
-    //                 'model' => 'gpt-3.5-turbo',
-    //                 'messages' => $messages,
-    //                 'max_tokens' => 300,
-    //             ]);
-    //  */
-    //             // Check if the API request was successful
-    //             /* if ($response->successful()) {
-    //                 $responseData = $response->json();
-    //                 $outputText = $responseData['choices'][0]['message']['content'] ?? null;
-    //             } else {
-    //                 throw new Exception('OpenAI API request failed: ' . $response->body());
-    //             } */
-
-    //             // Create new conversation if none exists
-    //             if (!$conversation) {
-    //                 // Generate conversation name based on input
-    //                 $conversationName = substr($inputText, 0, 20);
-    //                 if (strlen($inputText) > 20) {
-    //                     $conversationName .= '...';
-    //                 }
-    //                 $conversation = Conversation::create([
-    //                     'user_id' => $user->id,
-    //                     'name' => $conversationName,
-    //                 ]);
-    //             }
-
-    //             // Store conversation data
-    //             $conversationData = ConversationData::create([
-    //                 'conversation_id' => $conversation->id,
-    //                 'input_text' => $inputText,
-    //                 'output_text' => $outputText,
-    //             ]);
-
-    //             // Prepare success response
-    //             $success = [
-    //                 'conversation_id' => $conversation->id,
-    //                 'conversation_name' => $conversation->name,
-    //                 'user_id' => $conversation->user_id,
-    //                 'input_text' => $conversationData->input_text,
-    //                 'output_text' => $conversationData->output_text,
-    //                 'created_at' => $conversationData->created_at,
-    //                 'updated_at' => $conversationData->updated_at,
-    //             ];
-    //             $message = 'Conversation updated successfully';
-    //             return $this->sendResponse($success, $message);
-    //         } catch (Exception $e) {
-    //             Log::error('Conversation creation failed: ' . $e->getMessage());
-    //             return $this->sendError('Failed to process conversation', ['error' => $e->getMessage()], 500);
+    //         // Check if the API request was successful
+    //         if ($response->successful()) {
+    //             $responseData = $response->json();
+    //             $outputText   = $responseData['choices'][0]['message']['content'] ?? null;
+    //         } else {
+    //             throw new Exception('OpenAI API request failed: ' . $response->body());
     //         }
+
+    //         // Create new conversation if none exists
+    //         if (! $conversation) {
+    //             // Generate conversation name based on input
+    //             $conversationName = substr($inputText, 0, 20);
+    //             if (strlen($inputText) > 20) {
+    //                 $conversationName .= '...';
+    //             }
+    //             $conversation = Conversation::create([
+    //                 'user_id' => $user->id,
+    //                 'name'    => $conversationName,
+    //             ]);
+    //         }
+
+    //         // Store conversation data
+    //         $conversationData = ConversationData::create([
+    //             'conversation_id' => $conversation->id,
+    //             'input_text'      => $inputText,
+    //             'output_text'     => $outputText,
+    //         ]);
+
+    //         // Prepare success response
+    //         $success = [
+    //             'conversation_id'   => $conversation->id,
+    //             'conversation_name' => $conversation->name,
+    //             'user_id'           => $conversation->user_id,
+    //             'input_text'        => $conversationData->input_text,
+    //             'output_text'       => $conversationData->output_text,
+    //             'created_at'        => $conversationData->created_at,
+    //             'updated_at'        => $conversationData->updated_at,
+    //         ];
+    //         $message = 'Conversation updated successfully';
+    //         return $this->sendResponse($success, $message);
+    //     } catch (Exception $e) {
+    //         Log::error('Conversation creation failed: ' . $e->getMessage());
+    //         return $this->sendError('Failed to process conversation', ['error' => $e->getMessage()], 500);
     //     }
+    // }
 
     public function storeConversation(Request $request)
     {
         $apiKey = config('services.openAi.api_key');
-        if (!$apiKey) {
+        if (! $apiKey) {
             return $this->sendError('API Key Missing', ['error' => 'OpenAI API key is not configured'], 500);
         }
 
         $validated = $request->validate([
-            'input_text' => 'required|string|max:2000',
+            'input_text'      => 'required|string|max:2000',
             'conversation_id' => 'nullable|integer|exists:conversations,id',
         ]);
 
         try {
-            $user = auth('api')->user();
+            $user       = auth('api')->user();
             $guestToken = $request->header('Guest-Token');
 
-            if (!$user && !$guestToken) {
+            if (! $user && ! $guestToken) {
                 return $this->sendError('Unauthorized', ['error' => 'No user or guest token provided'], 401);
             }
 
             // Handle guest user creation
-            if (!$user && $guestToken) {
+            if (! $user && $guestToken) {
                 $user = User::firstOrCreate(
                     ['guest_token' => $guestToken],
                     [
-                        'is_guest' => true,
+                        'is_guest'    => true,
                         'guest_token' => $guestToken,
                     ]
                 );
             }
 
-            $isGuest = $user->is_guest;
+            $isGuest      = $user->is_guest;
             $isSubscribed = $user->is_subscribe ?? false;
-            $now = now();
-            $today = $now->toDateString();
+            $now          = now();
+            $today        = $now->toDateString();
 
             // Usage tracking
             $usage = ConversationUsage::firstOrNew([
-                'user_id' => $user->id,
+                'user_id'     => $user->id,
                 'guest_token' => $user->guest_token,
-                'date' => $today,
+                'date'        => $today,
             ]);
 
-            if (!$usage->first_used_at) {
+            if (! $usage->first_used_at) {
                 $usage->first_used_at = $now;
             }
             $usage->last_used_at = $now;
 
-            $usedMinutes = Carbon::parse($usage->first_used_at)->diffInMinutes($usage->last_used_at);
+            $usedMinutes          = Carbon::parse($usage->first_used_at)->diffInMinutes($usage->last_used_at);
             $usage->usage_minutes = $usedMinutes;
 
             $maxMinutes = $isSubscribed ? 9999999 : ($isGuest ? 1 : 2);
 
             if ($usedMinutes >= $maxMinutes) {
                 $errorMessage = $isGuest
-                    ? "You have exceeded the guest usage limit of $maxMinutes minutes."
-                    : "You have exceeded the subscription usage limit of $maxMinutes minutes.";
+                ? "You have exceeded the guest usage limit of $maxMinutes minutes."
+                : "You have exceeded the subscription usage limit of $maxMinutes minutes.";
 
                 return $this->sendError('Usage limit exceeded', ['error' => $errorMessage], 429);
             }
 
-            $inputText = $validated['input_text'];
+            $inputText      = $validated['input_text'];
             $conversationId = $validated['conversation_id'] ?? null;
-            $outputText = "response text"; // Replace with actual API call
-            $messages = [['role' => 'system', 'content' => 'You are a helpful assistant.']];
-            $conversation = null;
+            $outputText     = "response text"; // Replace with actual API call
+            $messages       = [['role' => 'system', 'content' => 'You are a helpful assistant.']];
+            $conversation   = null;
 
             if ($conversationId) {
                 $query = Conversation::where('id', $conversationId);
@@ -284,33 +275,33 @@ class ConversationApiController extends Controller
 
             $messages[] = ['role' => 'user', 'content' => $inputText];
 
-            if (!$conversation) {
+            if (! $conversation) {
                 $conversation = Conversation::create([
-                    'user_id' => $user->id ?? null,
+                    'user_id'     => $user->id ?? null,
                     'guest_token' => $guestToken ?? null,
-                    'name' => Str::limit($inputText, 20),
-                    'started_at' => now(),
+                    'name'        => Str::limit($inputText, 20),
+                    'started_at'  => now(),
                 ]);
             }
 
             $conversationData = ConversationData::create([
                 'conversation_id' => $conversation->id,
-                'input_text' => $inputText,
-                'output_text' => $outputText,
+                'input_text'      => $inputText,
+                'output_text'     => $outputText,
             ]);
 
             $usage->is_guest = $isGuest;
             $usage->save();
 
             return $this->sendResponse([
-                'conversation_id' => $conversation->id,
+                'conversation_id'   => $conversation->id,
                 'conversation_name' => $conversation->name,
-                'user_id' => $conversation->user_id,
-                'guest_token' => $conversation->guest_token,
-                'input_text' => $conversationData->input_text,
-                'output_text' => $conversationData->output_text,
-                'usage_minutes' => $usedMinutes,
-                'limit_minutes' => $maxMinutes,
+                'user_id'           => $conversation->user_id,
+                'guest_token'       => $conversation->guest_token,
+                'input_text'        => $conversationData->input_text,
+                'output_text'       => $conversationData->output_text,
+                'usage_minutes'     => $usedMinutes,
+                'limit_minutes'     => $maxMinutes,
             ], 'Conversation stored successfully');
         } catch (Exception $e) {
             Log::error('Conversation store error: ' . $e->getMessage());
@@ -319,14 +310,14 @@ class ConversationApiController extends Controller
     }
     public function getConversationDetails(Request $request, $conversation_id)
     {
-        $user = auth('api')->user();
+        $user       = auth('api')->user();
         $guestToken = $request->header('Guest-Token');
 
-        if (!$user && !$guestToken) {
+        if (! $user && ! $guestToken) {
             return $this->sendError('Unauthorized', ['error' => 'No user or guest token provided'], 401);
         }
 
-        if (!is_numeric($conversation_id) || $conversation_id <= 0) {
+        if (! is_numeric($conversation_id) || $conversation_id <= 0) {
             return $this->sendError('Invalid Input', ['error' => 'Invalid conversation ID'], 422);
         }
 
@@ -343,24 +334,24 @@ class ConversationApiController extends Controller
                 $q->orderBy('created_at', 'asc');
             }])->first();
 
-            if (!$conversation) {
+            if (! $conversation) {
                 return $this->sendError('Not Found', ['error' => 'Conversation not found or access denied'], 404);
             }
 
             $response = [
-                'id' => $conversation->id,
-                'user_id' => $conversation->user_id,
-                'guest_token' => $conversation->guest_token,
-                'name' => $conversation->name ?? 'Untitled Conversation',
-                'created_at' => $conversation->created_at->toISOString(),
-                'updated_at' => $conversation->updated_at->toISOString(),
+                'id'                => $conversation->id,
+                'user_id'           => $conversation->user_id,
+                'guest_token'       => $conversation->guest_token,
+                'name'              => $conversation->name ?? 'Untitled Conversation',
+                'created_at'        => $conversation->created_at->toISOString(),
+                'updated_at'        => $conversation->updated_at->toISOString(),
                 'conversation_data' => $conversation->conversationData->map(function ($data) {
                     return [
-                        'id' => $data->id,
-                        'input_text' => $data->input_text,
+                        'id'          => $data->id,
+                        'input_text'  => $data->input_text,
                         'output_text' => $data->output_text,
-                        'created_at' => $data->created_at->toISOString(),
-                        'updated_at' => $data->updated_at->toISOString(),
+                        'created_at'  => $data->created_at->toISOString(),
+                        'updated_at'  => $data->updated_at->toISOString(),
                     ];
                 })->toArray(),
             ];

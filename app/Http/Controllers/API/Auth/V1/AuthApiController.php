@@ -158,8 +158,6 @@ class AuthApiController extends Controller
         }
     }
 
-
-
     //email verified
     public function verifyEmailApi(Request $request)
     {
