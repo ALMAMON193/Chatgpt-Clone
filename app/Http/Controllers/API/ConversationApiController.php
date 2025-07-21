@@ -4,17 +4,20 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\ConversationData;
+use App\Models\ConversationUsage;
 use App\Models\User;
 use App\Traits\ApiResponse;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ConversationApiController extends Controller
 {
     use ApiResponse;
 
-    public function createGuestUser(Request $request)
+    public function createGuestUser(Request $request): \Illuminate\Http\JsonResponse
     {
         $request->validate([
             'guest_token' => 'required|string',
@@ -35,7 +38,7 @@ class ConversationApiController extends Controller
 
         return $this->sendResponse($responseData, $message);
     }
-    public function getConversations(Request $request)
+    public function getConversations(Request $request): \Illuminate\Http\JsonResponse
     {
         $user       = auth('api')->user();
         $guestToken = $request->header('Guest-Token');
@@ -186,7 +189,7 @@ class ConversationApiController extends Controller
     //     }
     // }
 
-    public function storeConversation(Request $request)
+    public function storeConversation(Request $request): \Illuminate\Http\JsonResponse
     {
         $apiKey = config('services.openAi.api_key');
         if (! $apiKey) {
@@ -237,7 +240,7 @@ class ConversationApiController extends Controller
             $usedMinutes          = Carbon::parse($usage->first_used_at)->diffInMinutes($usage->last_used_at);
             $usage->usage_minutes = $usedMinutes;
 
-            $maxMinutes = $isSubscribed ? 9999999 : ($isGuest ? 1 : 2);
+            $maxMinutes = $isSubscribed ? 9999999 : ($isGuest ? 10 : 20);
 
             if ($usedMinutes >= $maxMinutes) {
                 $errorMessage = $isGuest
@@ -308,7 +311,7 @@ class ConversationApiController extends Controller
             return $this->sendError('Failed to process conversation', ['error' => $e->getMessage()], 500);
         }
     }
-    public function getConversationDetails(Request $request, $conversation_id)
+    public function getConversationDetails(Request $request, $conversation_id): \Illuminate\Http\JsonResponse
     {
         $user       = auth('api')->user();
         $guestToken = $request->header('Guest-Token');

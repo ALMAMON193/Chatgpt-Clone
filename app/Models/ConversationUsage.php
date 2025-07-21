@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @method static firstOrNew(array $array)
+ */
 class ConversationUsage extends Model
 {
     protected $fillable = [
